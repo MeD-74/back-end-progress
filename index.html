@@ -318,6 +318,7 @@
         background: rgba(76, 175, 80, 0.1);
         border-radius: 4px;
         transition: 0.2s;
+        direction: ltr;
       }
       .sync-id-display:hover {
         background: rgba(76, 175, 80, 0.2);
@@ -327,7 +328,7 @@
         font-weight: 600;
       }
 
-      /* Stats Cards - Updated Layout */
+      /* Stats Cards */
       .stats-container {
         display: grid;
         grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
@@ -392,6 +393,7 @@
         display: flex;
         gap: 0.5rem;
         flex-wrap: wrap;
+        direction: ltr;
       }
       .speed-btn {
         background: var(--bg-color);
@@ -482,6 +484,7 @@
         font-weight: bold;
         display: inline-block;
         text-align: center;
+        direction: ltr;
       }
 
       .module-details {
@@ -637,7 +640,7 @@
         <div class="modal-actions" id="modal-actions"></div>
       </div>
     </div>
-    <div class="toast" id="custom-toast">تم!</div>
+    <div class="toast" id="custom-toast">Done!</div>
 
     <div id="login-screen">
       <div class="login-card">
@@ -697,16 +700,16 @@
       <div class="header-flex">
         <h2>.NET Tracker</h2>
         <div class="sync-badge">
-          <span id="sync-indicator">✅ متزامن</span>
+          <span id="sync-indicator">✅ Sync</span>
           <div style="display: flex; align-items: center; gap: 0.5rem">
             <span style="color: var(--text-muted); font-size: 0.9rem"
-              >كود الربط (Bin ID):</span
+              >Bin ID:</span
             >
             <span
               class="sync-id-display"
               id="display-bin-id"
               onclick="copyBinId()"
-              title="اضغط للنسخ"
+              title="Click to copy"
               >---</span
             >
           </div>
@@ -722,7 +725,7 @@
             "
             onclick="logout()"
           >
-            خروج
+            Logout
           </button>
         </div>
       </div>
@@ -828,7 +831,7 @@
       function copyBinId() {
         navigator.clipboard
           .writeText(document.getElementById("display-bin-id").innerText)
-          .then(() => showToast("تم نسخ كود الربط! 📋"));
+          .then(() => showToast("Copied! 📋"));
       }
 
       function showLoading(msg = "⏳ جاري الاتصال...") {
@@ -893,7 +896,7 @@
         .addEventListener("change", async (e) => {
           const key = document.getElementById("api-key-input").value.trim();
           if (!key) {
-            document.getElementById("folderInput").value = ""; // reset
+            document.getElementById("folderInput").value = "";
             return showModal(
               "تنبيه",
               "دخل الـ Master Key الأول عشان نرفع الداتا بمجرد ما نقرأها!",
@@ -916,7 +919,6 @@
             let topicName = "توبيكات عامة",
               sessionName = "جلسات";
 
-            // Assuming typical structure: CourseFolder / TopicFolder / SessionFolder / video.mp4
             if (parts.length >= 4) {
               topicName = parts[1];
               sessionName = parts[2];
@@ -1020,7 +1022,7 @@
         const config = JSON.parse(localStorage.getItem("dotNetCloudConfig"));
         if (!config) return;
         const indicator = document.getElementById("sync-indicator");
-        indicator.innerText = "⏳ جاري الحفظ...";
+        indicator.innerText = "⏳ Syncing...";
         indicator.style.color = "#ff9800";
         clearTimeout(saveTimeout);
         saveTimeout = setTimeout(async () => {
@@ -1037,11 +1039,11 @@
               },
             );
             if (res.ok) {
-              indicator.innerText = "✅ تم الحفظ";
+              indicator.innerText = "✅ Saved";
               indicator.style.color = "var(--accent-color)";
             }
           } catch (e) {
-            indicator.innerText = "❌ خطأ";
+            indicator.innerText = "❌ Error";
             indicator.style.color = "var(--danger-color)";
           }
         }, 1500);
@@ -1059,7 +1061,7 @@
         );
       }
 
-      // --- Dashboard & Accurately Calculating Logic ---
+      // --- Dashboard & Time Calculation ---
       function startDashboard(binId) {
         document.getElementById("login-screen").style.display = "none";
         document.getElementById("dashboard-screen").style.display = "block";
@@ -1067,15 +1069,15 @@
         renderDashboard();
       }
 
-      // دالة تحويل الوقت بدقة عالية (تم تقريب الدقايق عشان ميطيرش ثواني)
+      // دالة تحويل الوقت للغة الإنجليزية (h للمن الساعات و m للدقائق)
       function formatSecToTime(totalSeconds) {
-        if (totalSeconds <= 0) return "0د";
+        if (totalSeconds <= 0) return "0m";
         const totalMins = Math.round(totalSeconds / 60);
         const h = Math.floor(totalMins / 60);
         const m = totalMins % 60;
-        if (h === 0) return `${m}د`;
-        if (m === 0) return `${h}س`;
-        return `${h}س ${m}د`;
+        if (h === 0) return `${m}m`;
+        if (m === 0) return `${h}h`;
+        return `${h}h ${m}m`;
       }
 
       function renderDashboard() {
@@ -1097,7 +1099,6 @@
           topic.sessions.forEach((session, sIndex) => {
             detailsHTML += `<div class="session-block"><div class="session-title">${session.name}</div>`;
             session.videos.forEach((video, vIndex) => {
-              // تجميع ثواني كل فيديو بدقة
               topicTotalSec += video.sec;
               topicTotalVideos++;
               if (video.completed) {
@@ -1125,7 +1126,6 @@
           globalTotalVideos += topicTotalVideos;
           globalCompletedVideos += topicCompletedVideos;
 
-          // حسابات التوبيك الدقيقة متأثرة بالسرعة
           const speedAdjustedTotal = topicTotalSec / currentSpeed;
           const speedAdjustedCompleted = topicCompletedSec / currentSpeed;
           const speedAdjustedRemaining =
@@ -1138,7 +1138,7 @@
           modCard.innerHTML = `
                     <div class="module-header" onclick="toggleAccordion('mod-${tIndex}')">
                         <div class="m-title"><span class="arrow">▶</span> ${topic.folder}</div>
-                        <div class="m-stat"><span class="m-stat-label">التقدم:</span> <span class="badge">${topicCompletedVideos} / ${topicTotalVideos} فيديو</span></div>
+                        <div class="m-stat"><span class="m-stat-label">التقدم:</span> <span class="badge">${topicCompletedVideos} / ${topicTotalVideos}</span></div>
                         <div class="m-stat"><span class="m-stat-label">الإجمالي:</span> <span class="m-stat-val">${formatSecToTime(speedAdjustedTotal)}</span></div>
                         <div class="m-stat" style="color: var(--danger-color); font-weight: bold;"><span class="m-stat-label">المتبقي:</span> <span class="m-stat-val">${formatSecToTime(speedAdjustedRemaining)}</span></div>
                     </div>
@@ -1149,12 +1149,12 @@
           container.appendChild(modCard);
         });
 
-        // حسابات الإجمالي العليا بدقة مع السرعة
         const topTotalSec = globalTotalSec / currentSpeed;
         const topCompletedSec = globalCompletedSec / currentSpeed;
         const topRemainingSec =
           Math.max(0, globalTotalSec - globalCompletedSec) / currentSpeed;
 
+        // Updated IDs mapping for English time rendering
         document.getElementById("stat-total-videos").innerText =
           globalTotalVideos;
         document.getElementById("stat-completed-videos").innerText =
