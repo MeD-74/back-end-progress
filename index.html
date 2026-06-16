@@ -1,0 +1,572 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Course Tracker - Cloud Sync</title>
+    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-color: #121212; --card-bg: #1e1e1e; --text-main: #ffffff;
+            --text-muted: #a3a3a3; --border-color: #333333; --accent-color: #4caf50;
+            --hover-bg: #2a2a2a; --danger-color: #f44336;
+        }
+
+        body { font-family: 'Cairo', sans-serif; background-color: var(--bg-color); color: var(--text-main); margin: 0; padding: 1.5rem; box-sizing: border-box; overflow-x: hidden; }
+        
+        /* --- Custom Scrollbar --- */
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: var(--bg-color); }
+        ::-webkit-scrollbar-thumb { background: var(--border-color); border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: var(--text-muted); }
+
+        /* --- Custom Modal (Popup) & Toast --- */
+        .modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); display: flex; justify-content: center; align-items: center; z-index: 1000; opacity: 0; visibility: hidden; transition: 0.3s ease; backdrop-filter: blur(5px); }
+        .modal-overlay.active { opacity: 1; visibility: visible; }
+        .modal-box { background: var(--card-bg); padding: 2rem; border-radius: 12px; width: 90%; max-width: 400px; text-align: center; border: 1px solid var(--border-color); transform: translateY(-20px); transition: 0.3s ease; box-shadow: 0 15px 30px rgba(0,0,0,0.5); }
+        .modal-overlay.active .modal-box { transform: translateY(0); }
+        .modal-title { font-size: 1.3rem; margin-bottom: 1rem; color: var(--accent-color); font-weight: bold; }
+        .modal-text { color: var(--text-muted); margin-bottom: 1.5rem; line-height: 1.6; }
+        .modal-actions { display: flex; gap: 1rem; justify-content: center; }
+        .modal-btn { padding: 0.6rem 1.5rem; border-radius: 6px; cursor: pointer; border: none; font-family: inherit; font-weight: bold; transition: 0.2s; }
+        .modal-btn-primary { background: var(--accent-color); color: white; }
+        .modal-btn-primary:hover { background: #45a049; }
+        .modal-btn-danger { background: var(--danger-color); color: white; }
+        .modal-btn-danger:hover { background: #d32f2f; }
+        .modal-btn-secondary { background: transparent; border: 1px solid var(--border-color); color: var(--text-main); }
+        .modal-btn-secondary:hover { background: var(--hover-bg); }
+
+        .toast { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%) translateY(100px); background: var(--accent-color); color: white; padding: 0.8rem 1.5rem; border-radius: 30px; z-index: 1001; font-weight: bold; box-shadow: 0 5px 15px rgba(0,0,0,0.3); transition: 0.4s cubic-bezier(0.68, -0.55, 0.265, 1.55); opacity: 0; }
+        .toast.show { transform: translateX(-50%) translateY(0); opacity: 1; }
+
+        /* --- Login Screen --- */
+        #login-screen { display: flex; justify-content: center; align-items: center; min-height: 85vh; }
+        .login-card { background: var(--card-bg); padding: 2.5rem 2rem; border-radius: 16px; width: 100%; max-width: 450px; border: 1px solid var(--border-color); box-shadow: 0 10px 40px rgba(0,0,0,0.6); text-align: center; }
+        .login-card h2 { color: var(--accent-color); font-size: 1.8rem; margin-top: 0; margin-bottom: 0.5rem; }
+        .login-card p { color: var(--text-muted); margin-bottom: 2rem; font-size: 0.95rem; }
+        .input-group { margin-bottom: 1.5rem; text-align: right; }
+        .input-group label { display: block; margin-bottom: 0.5rem; color: #ddd; font-size: 0.9rem; font-weight: 600; }
+        .custom-input { width: 100%; padding: 0.9rem 1rem; background: var(--bg-color); border: 1px solid var(--border-color); color: #fff; border-radius: 8px; font-family: monospace; box-sizing: border-box; transition: 0.2s; direction: ltr; }
+        .custom-input:focus { outline: none; border-color: var(--accent-color); box-shadow: 0 0 0 2px rgba(76, 175, 80, 0.2); }
+        .btn-block { width: 100%; padding: 0.9rem; border-radius: 8px; cursor: pointer; font-family: 'Cairo', sans-serif; font-weight: bold; border: none; transition: 0.2s; font-size: 1rem; margin-bottom: 1rem; }
+        .btn-primary { background: var(--accent-color); color: white; }
+        .btn-primary:hover { background: #45a049; transform: translateY(-2px); }
+        .btn-secondary { background: transparent; border: 1px solid var(--border-color); color: var(--text-muted); }
+        .btn-secondary:hover { background: var(--hover-bg); color: var(--text-main); }
+        #loading-msg { display: none; color: var(--accent-color); font-weight: bold; margin-top: 1rem; }
+
+        /* --- Dashboard Screen --- */
+        #dashboard-screen { display: none; max-width: 1200px; margin: 0 auto; }
+        .header-flex { display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem; flex-wrap: wrap; gap: 1rem; background: var(--card-bg); padding: 1.5rem; border-radius: 12px; border: 1px solid var(--border-color); }
+        .header-flex h2 { margin: 0; font-size: 1.4rem; color: var(--text-main); }
+        .sync-badge { background: var(--bg-color); padding: 0.6rem 1rem; border-radius: 8px; display: flex; align-items: center; gap: 1rem; border: 1px solid var(--border-color); flex-wrap: wrap; }
+        .sync-id-display { font-family: monospace; color: var(--accent-color); font-weight: bold; letter-spacing: 1px; cursor: pointer; padding: 0.2rem 0.5rem; background: rgba(76, 175, 80, 0.1); border-radius: 4px; transition: 0.2s; }
+        .sync-id-display:hover { background: rgba(76, 175, 80, 0.2); }
+        #sync-indicator { font-size: 0.9rem; font-weight: 600; }
+
+        /* Stats Cards */
+        .stats-container { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1rem; margin-bottom: 2rem; }
+        .stat-card { background-color: var(--card-bg); padding: 1.5rem; border-radius: 12px; display: flex; flex-direction: column; gap: 0.5rem; border: 1px solid var(--border-color); position: relative; overflow: hidden; }
+        .stat-card::before { content: ''; position: absolute; right: 0; top: 0; height: 100%; width: 4px; background: var(--accent-color); }
+        .stat-card.danger::before { background: var(--danger-color); }
+        .stat-card .title { color: var(--text-muted); font-size: 0.95rem; font-weight: 600; }
+        .stat-card .value { font-size: 1.8rem; font-weight: 700; color: var(--text-main); direction: ltr; text-align: right; }
+
+        /* Speed Controls */
+        .controls-section { background-color: var(--card-bg); padding: 1.2rem; border-radius: 12px; display: flex; align-items: center; gap: 1.5rem; margin-bottom: 2rem; border: 1px solid var(--border-color); flex-wrap: wrap; }
+        .speed-buttons { display: flex; gap: 0.5rem; flex-wrap: wrap; }
+        .speed-btn { background: var(--bg-color); border: 1px solid var(--border-color); color: var(--text-main); padding: 0.5rem 1rem; border-radius: 8px; cursor: pointer; font-family: 'Cairo', sans-serif; font-weight: 600; transition: 0.2s; }
+        .speed-btn:hover { background: var(--hover-bg); border-color: var(--text-muted); }
+        .speed-btn.active { background: var(--accent-color); border-color: var(--accent-color); color: #fff; }
+
+        /* --- Responsive List (Replaces Table) --- */
+        .module-list { display: flex; flex-direction: column; gap: 1rem; margin-bottom: 2rem; }
+        .module-card { background: var(--card-bg); border-radius: 12px; border: 1px solid var(--border-color); overflow: hidden; }
+        
+        .module-header { display: grid; grid-template-columns: 2fr 1fr 1fr 1fr; gap: 1rem; padding: 1.2rem 1.5rem; align-items: center; cursor: pointer; transition: 0.2s; user-select: none; }
+        .module-header:hover { background: var(--hover-bg); }
+        
+        .m-title { font-weight: 700; font-size: 1.1rem; display: flex; align-items: center; gap: 0.8rem; }
+        .m-title .arrow { font-size: 0.8rem; color: var(--text-muted); transition: transform 0.3s ease; }
+        .module-card.open .m-title .arrow { transform: rotate(90deg); }
+        
+        .m-stat { display: flex; flex-direction: column; font-size: 0.95rem; }
+        .m-stat-label { font-size: 0.75rem; color: var(--text-muted); margin-bottom: 0.2rem; display: none; } /* Hidden on desktop */
+        .m-stat-val { direction: ltr; text-align: right; }
+        .badge { background-color: rgba(76, 175, 80, 0.1); color: var(--accent-color); padding: 0.3rem 0.8rem; border-radius: 20px; font-size: 0.9rem; font-weight: bold; display: inline-block; text-align: center; }
+
+        /* Smooth Accordion Magic */
+        .module-details { display: grid; grid-template-rows: 0fr; transition: grid-template-rows 0.4s ease-in-out; background-color: #161616; border-top: 1px solid transparent; }
+        .module-card.open .module-details { grid-template-rows: 1fr; border-top-color: var(--border-color); }
+        .details-inner { min-height: 0; overflow: hidden; } /* Crucial for Grid animation */
+        
+        .details-content { padding: 1.5rem; }
+        .session-block { margin-bottom: 1.5rem; }
+        .session-title { color: var(--accent-color); font-weight: 700; margin-bottom: 1rem; font-size: 1rem; border-bottom: 1px dashed var(--border-color); padding-bottom: 0.5rem; display: inline-block;}
+        
+        /* Custom Checkbox Item */
+        .video-item { display: flex; justify-content: space-between; align-items: center; padding: 0.8rem 1rem; background-color: var(--card-bg); margin-bottom: 0.5rem; border-radius: 8px; border: 1px solid var(--border-color); transition: 0.2s; cursor: pointer; }
+        .video-item:hover { border-color: var(--text-muted); background-color: var(--hover-bg); }
+        .video-item.completed { opacity: 0.7; }
+        .video-item.completed .video-name { text-decoration: line-through; color: var(--text-muted); }
+        
+        .checkbox-wrapper { display: flex; align-items: center; gap: 12px; pointer-events: none; width: 80%;}
+        .custom-check { width: 22px; height: 22px; border: 2px solid #555; border-radius: 6px; display: flex; justify-content: center; align-items: center; transition: all 0.2s; position: relative; flex-shrink: 0;}
+        .video-item.completed .custom-check { background-color: var(--accent-color); border-color: var(--accent-color); }
+        .video-item.completed .custom-check::after { content: '✔'; color: white; font-size: 14px; font-weight: bold; }
+        
+        .video-name { font-weight: 600; font-size: 0.95rem; transition: 0.2s; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .video-duration { color: var(--text-muted); font-size: 0.85rem; direction: ltr; font-weight: 600; background: var(--bg-color); padding: 0.2rem 0.6rem; border-radius: 6px;}
+
+        /* --- Mobile Responsiveness --- */
+        @media (max-width: 768px) {
+            body { padding: 1rem; }
+            .module-header { grid-template-columns: 1fr; gap: 0.8rem; }
+            .m-stat { flex-direction: row; justify-content: space-between; align-items: center; background: rgba(255,255,255,0.03); padding: 0.5rem 0.8rem; border-radius: 6px;}
+            .m-stat-label { display: block; margin: 0; }
+            .m-stat-val { text-align: left; }
+            .badge { padding: 0.2rem 0.6rem; }
+            .video-item { flex-direction: column; align-items: flex-start; gap: 0.8rem; }
+            .checkbox-wrapper { width: 100%; }
+            .video-name { white-space: normal; }
+            .video-duration { align-self: flex-end; }
+            .sync-badge { width: 100%; justify-content: space-between; }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="modal-overlay" id="custom-modal">
+        <div class="modal-box">
+            <div class="modal-title" id="modal-title">تنبيه</div>
+            <div class="modal-text" id="modal-text">الرسالة هنا</div>
+            <div class="modal-actions" id="modal-actions">
+                </div>
+        </div>
+    </div>
+
+    <div class="toast" id="custom-toast">تم النسخ بنجاح!</div>
+
+    <div id="login-screen">
+        <div class="login-card">
+            <h2>تسجيل الدخول للكورس 🚀</h2>
+            <p>اربط الداشبورد بقاعدة البيانات السحابية بتاعتك.</p>
+
+            <div class="input-group">
+                <label>الـ Master Key السري:</label>
+                <input type="password" id="api-key-input" class="custom-input" placeholder="Paste your API key here..." />
+            </div>
+
+            <div class="input-group" id="bin-id-group">
+                <label>كود الربط (Bin ID) - اختياري للمستخدم الجديد:</label>
+                <input type="text" id="bin-id-input" class="custom-input" placeholder="e.g., 64a8b7..." />
+            </div>
+
+            <div id="action-buttons">
+                <button class="btn-block btn-primary" onclick="handleLogin()">تسجيل الدخول / استرجاع البيانات</button>
+                <button class="btn-block btn-secondary" onclick="createNewCloud()">إنشاء حساب/داتا جديدة</button>
+            </div>
+            
+            <div id="loading-msg">⏳ جاري الاتصال... ثواني يا هندسة</div>
+        </div>
+    </div>
+
+    <div id="dashboard-screen">
+        <div class="header-flex">
+            <h2>.NET Course Tracker</h2>
+            <div class="sync-badge">
+                <span id="sync-indicator">✅ متزامن</span>
+                <div style="display: flex; align-items: center; gap: 0.5rem;">
+                    <span style="color: var(--text-muted); font-size: 0.9rem;">كود الربط:</span>
+                    <span class="sync-id-display" id="display-bin-id" onclick="copyBinId()" title="اضغط للنسخ">---</span>
+                </div>
+                <button class="btn-secondary" style="padding: 0.4rem 1rem; border-radius: 6px; font-weight: bold; border: none; background: rgba(244, 67, 54, 0.1); color: var(--danger-color);" onclick="logout()">خروج</button>
+            </div>
+        </div>
+
+        <div class="stats-container">
+            <div class="stat-card">
+                <span class="title">إجمالي الفيديوهات</span>
+                <span class="value" id="stat-total-videos">0</span>
+            </div>
+            <div class="stat-card">
+                <span class="title">المنجز</span>
+                <span class="value" id="stat-completed-videos" style="color: var(--accent-color);">0</span>
+            </div>
+            <div class="stat-card">
+                <span class="title">الوقت الكلي (<span class="speed-label">1</span>x)</span>
+                <span class="value" id="stat-total-time">0</span>
+            </div>
+            <div class="stat-card danger">
+                <span class="title">المتبقي (<span class="speed-label">1</span>x)</span>
+                <span class="value" id="stat-remaining-time">0</span>
+            </div>
+        </div>
+
+        <div class="controls-section">
+            <span class="title" style="color: var(--text-muted); font-weight: 600;">سرعة التشغيل:</span>
+            <div class="speed-buttons" id="speed-controls">
+                <button class="speed-btn active" data-speed="1">x1</button>
+                <button class="speed-btn" data-speed="1.25">x1.25</button>
+                <button class="speed-btn" data-speed="1.5">x1.5</button>
+                <button class="speed-btn" data-speed="1.75">x1.75</button>
+                <button class="speed-btn" data-speed="2">x2</button>
+                <button class="speed-btn" data-speed="2.25">x2.25</button>
+                <button class="speed-btn" data-speed="2.5">x2.5</button>
+                <button class="speed-btn" data-speed="2.75">x2.75</button>
+                <button class="speed-btn" data-speed="3">x3</button>
+            </div>
+        </div>
+
+        <div class="module-list" id="module-container">
+            </div>
+    </div>
+
+    <script>
+        let courseData = [];
+        let currentSpeed = 1;
+        let saveTimeout;
+
+        // --- Custom UI Elements Logic --- //
+        const modalOverlay = document.getElementById('custom-modal');
+        const modalTitle = document.getElementById('modal-title');
+        const modalText = document.getElementById('modal-text');
+        const modalActions = document.getElementById('modal-actions');
+        const toast = document.getElementById('custom-toast');
+
+        function showModal(title, text, isConfirm = false, onConfirm = null) {
+            modalTitle.innerText = title;
+            modalText.innerText = text;
+            modalActions.innerHTML = '';
+
+            if (isConfirm) {
+                const btnYes = document.createElement('button');
+                btnYes.className = 'modal-btn modal-btn-danger';
+                btnYes.innerText = 'متأكد';
+                btnYes.onclick = () => { closeModal(); if(onConfirm) onConfirm(); };
+                
+                const btnNo = document.createElement('button');
+                btnNo.className = 'modal-btn modal-btn-secondary';
+                btnNo.innerText = 'إلغاء';
+                btnNo.onclick = closeModal;
+
+                modalActions.appendChild(btnNo);
+                modalActions.appendChild(btnYes);
+            } else {
+                const btnOk = document.createElement('button');
+                btnOk.className = 'modal-btn modal-btn-primary';
+                btnOk.innerText = 'تمام';
+                btnOk.onclick = closeModal;
+                modalActions.appendChild(btnOk);
+            }
+            modalOverlay.classList.add('active');
+        }
+
+        function closeModal() {
+            modalOverlay.classList.remove('active');
+        }
+
+        function showToast(msg) {
+            toast.innerText = msg;
+            toast.classList.add('show');
+            setTimeout(() => toast.classList.remove('show'), 3000);
+        }
+
+        function copyBinId() {
+            const id = document.getElementById('display-bin-id').innerText;
+            navigator.clipboard.writeText(id).then(() => showToast('تم نسخ كود الربط بنجاح! 📋'));
+        }
+
+        // --- Cloud Logic --- //
+        window.onload = async () => {
+            const config = JSON.parse(localStorage.getItem('dotNetCloudConfig'));
+            if (config && config.key && config.binId) {
+                document.getElementById('login-screen').style.display = 'none';
+                
+                // Show a mini loading overlay
+                const loader = document.createElement('div');
+                loader.id = 'init-loader';
+                loader.style = "position:fixed; top:0; left:0; width:100%; height:100%; background:var(--bg-color); display:flex; justify-content:center; align-items:center; z-index:9999; color:var(--accent-color); font-size:1.5rem; font-weight:bold;";
+                loader.innerText = "⏳ جاري تحضير الداشبورد...";
+                document.body.appendChild(loader);
+
+                await fetchCloudData(config.key, config.binId);
+                loader.remove();
+            }
+        };
+
+        function showLoading() {
+            document.getElementById('action-buttons').style.display = 'none';
+            document.getElementById('loading-msg').style.display = 'block';
+        }
+        function hideLoading() {
+            document.getElementById('action-buttons').style.display = 'block';
+            document.getElementById('loading-msg').style.display = 'none';
+        }
+
+        async function handleLogin() {
+            const key = document.getElementById('api-key-input').value.trim();
+            const binId = document.getElementById('bin-id-input').value.trim();
+            
+            if(!key || !binId) {
+                return showModal('بيانات ناقصة', 'يا هندسة لازم تدخل الـ Master Key والـ Bin ID عشان تقدر تعمل لوجن.', false);
+            }
+
+            showLoading();
+            await fetchCloudData(key, binId, true);
+        }
+
+        async function createNewCloud() {
+            const key = document.getElementById('api-key-input').value.trim();
+            if(!key) {
+                return showModal('بيانات ناقصة', 'هات الـ Master Key الأول عشان ننشئلك الداتا.', false);
+            }
+            
+            showLoading();
+            const initialData = generateDefaultData();
+
+            try {
+                const res = await fetch('https://api.jsonbin.io/v3/b', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'X-Master-Key': key, 'X-Bin-Name': 'DotNetCourseProgress', 'X-Bin-Private': 'true' },
+                    body: JSON.stringify(initialData)
+                });
+                const result = await res.json();
+                
+                if (res.ok) {
+                    const binId = result.metadata.id;
+                    localStorage.setItem('dotNetCloudConfig', JSON.stringify({ key, binId }));
+                    courseData = initialData;
+                    startDashboard(binId);
+                } else {
+                    hideLoading();
+                    showModal('خطأ', 'حصلت مشكلة. اتأكد من المفتاح.\n' + result.message);
+                }
+            } catch(e) {
+                hideLoading();
+                showModal('خطأ اتصال', 'فشل الاتصال بالسيرفر! راجع النت.');
+            }
+        }
+
+        async function fetchCloudData(key, binId, isManualLogin = false) {
+            try {
+                const res = await fetch(`https://api.jsonbin.io/v3/b/${binId}/latest`, {
+                    headers: { 'X-Master-Key': key }
+                });
+                const result = await res.json();
+                
+                if (res.ok) {
+                    courseData = result.record;
+                    localStorage.setItem('dotNetCloudConfig', JSON.stringify({ key, binId }));
+                    startDashboard(binId);
+                } else {
+                    if (isManualLogin) hideLoading();
+                    showModal('خطأ', 'البيانات غلط أو كود الربط مش موجود!');
+                    localStorage.removeItem('dotNetCloudConfig');
+                }
+            } catch(e) {
+                if (isManualLogin) hideLoading();
+                showModal('خطأ اتصال', 'فشل الاتصال بالسيرفر! راجع النت.');
+            }
+        }
+
+        function triggerCloudSave() {
+            const config = JSON.parse(localStorage.getItem('dotNetCloudConfig'));
+            if(!config) return;
+
+            const indicator = document.getElementById('sync-indicator');
+            indicator.innerText = '⏳ جاري الحفظ...';
+            indicator.style.color = '#ff9800';
+            
+            clearTimeout(saveTimeout);
+            saveTimeout = setTimeout(async () => {
+                try {
+                    const res = await fetch(`https://api.jsonbin.io/v3/b/${config.binId}`, {
+                        method: 'PUT',
+                        headers: { 'Content-Type': 'application/json', 'X-Master-Key': config.key },
+                        body: JSON.stringify(courseData)
+                    });
+                    if (res.ok) {
+                        indicator.innerText = '✅ تم الحفظ';
+                        indicator.style.color = 'var(--accent-color)';
+                    }
+                } catch(e) {
+                    indicator.innerText = '❌ خطأ في الحفظ';
+                    indicator.style.color = 'var(--danger-color)';
+                }
+            }, 1500); 
+        }
+
+        function logout() {
+            showModal('تسجيل الخروج', 'لو خرجت هتحتاج الـ Master Key وكود الربط عشان ترجع تاني. متأكد؟', true, () => {
+                localStorage.removeItem('dotNetCloudConfig');
+                location.reload();
+            });
+        }
+
+        // --- Dashboard & Render Logic --- //
+        function startDashboard(binId) {
+            document.getElementById('login-screen').style.display = 'none';
+            document.getElementById('dashboard-screen').style.display = 'block';
+            document.getElementById('display-bin-id').innerText = binId;
+            renderDashboard();
+        }
+
+        function formatSecToTime(totalSeconds) {
+            if (totalSeconds <= 0) return "0د";
+            const h = Math.floor(totalSeconds / 3600);
+            const m = Math.floor((totalSeconds % 3600) / 60);
+            if (h === 0) return `${m}د`;
+            if (m === 0) return `${h}س`;
+            return `${h}س ${m}د`;
+        }
+
+        function renderDashboard() {
+            const container = document.getElementById('module-container');
+            container.innerHTML = '';
+
+            let globalTotalSec = 0, globalCompletedSec = 0, globalTotalVideos = 0, globalCompletedVideos = 0;
+
+            courseData.forEach((topic, tIndex) => {
+                let topicTotalSec = 0, topicCompletedSec = 0, topicTotalVideos = 0, topicCompletedVideos = 0;
+                let detailsHTML = '';
+
+                topic.sessions.forEach((session, sIndex) => {
+                    detailsHTML += `<div class="session-block"><div class="session-title">${session.name}</div>`;
+                    session.videos.forEach((video, vIndex) => {
+                        topicTotalSec += video.sec; topicTotalVideos++;
+                        if (video.completed) { topicCompletedSec += video.sec; topicCompletedVideos++; }
+
+                        const formatDur = formatSecToTime(video.sec);
+                        const completedClass = video.completed ? 'completed' : '';
+
+                        // The whole item is clickable now
+                        detailsHTML += `
+                            <div class="video-item ${completedClass}" onclick="toggleVideo(${tIndex}, ${sIndex}, ${vIndex}, this)">
+                                <div class="checkbox-wrapper">
+                                    <div class="custom-check"></div>
+                                    <span class="video-name" title="${video.title}">${video.title}</span>
+                                </div>
+                                <span class="video-duration">${formatDur}</span>
+                            </div>`;
+                    });
+                    detailsHTML += `</div>`;
+                });
+
+                globalTotalSec += topicTotalSec; globalCompletedSec += topicCompletedSec;
+                globalTotalVideos += topicTotalVideos; globalCompletedVideos += topicCompletedVideos;
+
+                const speedAdjustedRemaining = Math.max(0, topicTotalSec - topicCompletedSec) / currentSpeed;
+                const speedAdjustedTotal = topicTotalSec / currentSpeed;
+
+                const modCard = document.createElement('div');
+                modCard.className = 'module-card';
+                modCard.id = `mod-${tIndex}`;
+                
+                // Add "open" class if it was open (We can maintain state if we want, but default is closed)
+                // For this version, we start closed. The user clicks to open.
+                
+                modCard.innerHTML = `
+                    <div class="module-header" onclick="toggleAccordion('mod-${tIndex}')">
+                        <div class="m-title"><span class="arrow">▶</span> ${topic.folder}</div>
+                        <div class="m-stat"><span class="m-stat-label">التقدم:</span> <span class="badge">${topicCompletedVideos} / ${topicTotalVideos} فيديو</span></div>
+                        <div class="m-stat"><span class="m-stat-label">إجمالي الوقت:</span> <span class="m-stat-val">${formatSecToTime(speedAdjustedTotal)}</span></div>
+                        <div class="m-stat" style="color: var(--accent-color); font-weight: bold;"><span class="m-stat-label">المتبقي:</span> <span class="m-stat-val">${formatSecToTime(speedAdjustedRemaining)}</span></div>
+                    </div>
+                    <div class="module-details">
+                        <div class="details-inner">
+                            <div class="details-content" onclick="event.stopPropagation()">
+                                ${detailsHTML}
+                            </div>
+                        </div>
+                    </div>
+                `;
+                container.appendChild(modCard);
+            });
+
+            document.getElementById('stat-total-videos').innerText = globalTotalVideos;
+            document.getElementById('stat-completed-videos').innerText = globalCompletedVideos;
+            document.getElementById('stat-total-time').innerText = formatSecToTime(globalTotalSec / currentSpeed);
+            document.getElementById('stat-remaining-time').innerText = formatSecToTime(Math.max(0, globalTotalSec - globalCompletedSec) / currentSpeed);
+        }
+
+        // Global function attached to the video item div
+        window.toggleVideo = function(t, s, v, element) {
+            // Toggle data
+            courseData[t].sessions[s].videos[v].completed = !courseData[t].sessions[s].videos[v].completed;
+            
+            // Re-render UI
+            renderDashboard();
+            triggerCloudSave();
+            
+            // Keep the accordion open after re-rendering
+            document.getElementById(`mod-${t}`).classList.add('open');
+        }
+
+        // Accordion toggle logic
+        window.toggleAccordion = function(id) {
+            const card = document.getElementById(id);
+            card.classList.toggle('open');
+        }
+
+        document.getElementById('speed-controls').addEventListener('click', (e) => {
+            if(e.target.tagName === 'BUTTON') {
+                document.querySelectorAll('.speed-btn').forEach(b => b.classList.remove('active'));
+                e.target.classList.add('active');
+                currentSpeed = parseFloat(e.target.dataset.speed);
+                document.querySelectorAll('.speed-label').forEach(el => el.innerText = currentSpeed);
+                
+                // Re-render to update times
+                renderDashboard();
+                
+                // We don't save speed to cloud, it's a local preference
+            }
+        });
+
+        // --- Data Generator --- //
+        function generateDefaultData() {
+            let tempCourseData = [];
+            const rawStats = [
+                { folder: "00 Orientation", sessions: 1, videos: 8, totalSec: 96 * 60 }, { folder: "01 Database", sessions: 10, videos: 92, totalSec: 1288 * 60 },
+                { folder: "02 C# Basics", sessions: 5, videos: 51, totalSec: 765 * 60 }, { folder: "03 OOP", sessions: 6, videos: 54, totalSec: 864 * 60 },
+                { folder: "04 Advanced C#", sessions: 4, videos: 32, totalSec: 448 * 60 }, { folder: "05 LINQ", sessions: 2, videos: 21, totalSec: 315 * 60 },
+                { folder: "06 Entity Framework Core", sessions: 5, videos: 37, totalSec: 592 * 60 }, { folder: "07 MVC", sessions: 7, videos: 76, totalSec: 1140 * 60 },
+                { folder: "08 Web API", sessions: 7, videos: 47, totalSec: 752 * 60 }
+            ];
+
+            rawStats.forEach((stat, tIndex) => {
+                let topic = { id: `t${tIndex}`, folder: stat.folder, sessions: [] };
+                if (tIndex === 1) {
+                    topic.sessions.push({
+                        name: "Session 01 [ ERD ]",
+                        videos: [ { id: "v_1_1", title: "Part 01 File based System", sec: 1066, completed: false }, { id: "v_1_2", title: "Part 02 Database System", sec: 1029, completed: false }, { id: "v_1_3", title: "Part 03 Database Life Cycle", sec: 844, completed: false }, { id: "v_1_4", title: "Part 04 Database Types", sec: 902, completed: false }, { id: "v_1_5", title: "Part 05 ERD Concept", sec: 393, completed: false }, { id: "v_1_6", title: "Part 06 ERD - Entities", sec: 591, completed: false }, { id: "v_1_7", title: "Part 07 ERD - Attributes", sec: 637, completed: false }, { id: "v_1_8", title: "Part 08 ERD - Relationships", sec: 1378, completed: false }, { id: "v_1_9", title: "Part 09 Keys", sec: 515, completed: false }, { id: "v_1_10", title: "Part 10 Summary", sec: 331, completed: false }, { id: "v_1_11", title: "Part 11 Test", sec: 390, completed: false } ]
+                    });
+                    topic.sessions.push({
+                        name: "Session 02 [ Schema ]",
+                        videos: [ { id: "v_1_12", title: "Part 01 Revision", sec: 1111, completed: false }, { id: "v_1_13", title: "Part 02 Relational Database Definitions", sec: 325, completed: false }, { id: "v_1_14", title: "Part 03 Mapping ERD To Schema", sec: 505, completed: false }, { id: "v_1_15", title: "Part 04 Schema - Mapping of Entity Types", sec: 1231, completed: false }, { id: "v_1_16", title: "Part 05 Schema - Mapping of Binary Relation", sec: 1351, completed: false }, { id: "v_1_17", title: "Part 06 Schema - Mapping N-ary And Unary", sec: 1057, completed: false }, { id: "v_1_18", title: "Part 07 Relational Mapping Summary", sec: 314, completed: false } ]
+                    });
+                    
+                    let remainingVideos = 92 - 18, remainingSec = 77280 - (8076 + 5894);
+                    let vPerSession = Math.ceil(remainingVideos / 8), secPerVideo = Math.floor(remainingSec / remainingVideos), vCount = 19;
+                    for(let s = 3; s <= 10; s++) {
+                        let sess = { name: `Session ${s < 10 ? '0'+s : s}`, videos: [] };
+                        let vInThisSess = (s === 10) ? (remainingVideos - (vPerSession * 7)) : vPerSession;
+                        for(let v = 0; v < vInThisSess; v++) { sess.videos.push({ id: `v_1_${vCount}`, title: `Video Part ${vCount}`, sec: secPerVideo, completed: false }); vCount++; }
+                        topic.sessions.push(sess);
+                    }
+                } else {
+                    let vPerSession = Math.ceil(stat.videos / stat.sessions), secPerVideo = Math.floor(stat.totalSec / stat.videos), vCount = 1;
+                    for(let s = 1; s <= stat.sessions; s++) {
+                        let sess = { name: `Session ${s < 10 ? '0'+s : s}`, videos: [] };
+                        let vInThisSess = (s === stat.sessions) ? (stat.videos - (vPerSession * (stat.sessions - 1))) : vPerSession;
+                        for(let v = 0; v < vInThisSess; v++) { sess.videos.push({ id: `v_${tIndex}_${vCount}`, title: `Video Part ${vCount}`, sec: secPerVideo, completed: false }); vCount++; }
+                        topic.sessions.push(sess);
+                    }
+                }
+                tempCourseData.push(topic);
+            });
+            return tempCourseData;
+        }
+    </script>
+</body>
+</html>
