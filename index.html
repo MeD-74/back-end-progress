@@ -509,14 +509,41 @@
       .session-block {
         margin-bottom: 1.5rem;
       }
+
+      /* Session Header Flex */
+      .session-header-flex {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        border-bottom: 1px dashed var(--border-color);
+        padding-bottom: 0.5rem;
+        margin-bottom: 1rem;
+      }
       .session-title {
         color: var(--accent-color);
         font-weight: 700;
-        margin-bottom: 1rem;
         font-size: 1rem;
-        border-bottom: 1px dashed var(--border-color);
-        padding-bottom: 0.5rem;
-        display: inline-block;
+        margin: 0;
+      }
+      .session-toggle-btn {
+        background: rgba(76, 175, 80, 0.1);
+        color: var(--accent-color);
+        border: 1px solid var(--accent-color);
+        padding: 0.3rem 0.8rem;
+        border-radius: 6px;
+        font-size: 0.8rem;
+        cursor: pointer;
+        font-family: inherit;
+        font-weight: bold;
+        transition: 0.2s;
+      }
+      .session-toggle-btn.active {
+        background: var(--accent-color);
+        color: #fff;
+      }
+      .session-toggle-btn:hover {
+        background: var(--accent-color);
+        color: #fff;
       }
 
       .video-item {
@@ -784,7 +811,6 @@
       let currentSpeed = 1;
       let saveTimeout;
 
-      // --- Custom UI Elements ---
       const modalOverlay = document.getElementById("custom-modal");
       const modalTitle = document.getElementById("modal-title");
       const modalText = document.getElementById("modal-text");
@@ -795,7 +821,6 @@
         modalTitle.innerText = title;
         modalText.innerText = text;
         modalActions.innerHTML = "";
-
         if (isConfirm) {
           const btnYes = document.createElement("button");
           btnYes.className = "modal-btn modal-btn-danger";
@@ -819,7 +844,6 @@
         }
         modalOverlay.classList.add("active");
       }
-
       function closeModal() {
         modalOverlay.classList.remove("active");
       }
@@ -845,7 +869,6 @@
         document.getElementById("loading-msg").style.display = "none";
       }
 
-      // --- Init Logic ---
       window.onload = async () => {
         const config = JSON.parse(localStorage.getItem("dotNetCloudConfig"));
         if (config && config.key && config.binId) {
@@ -873,7 +896,6 @@
         await fetchCloudData(key, binId, true);
       }
 
-      // --- Read Real Video Files (The Genius Trick) ---
       function getVideoDuration(file) {
         return new Promise((resolve) => {
           const video = document.createElement("video");
@@ -882,7 +904,7 @@
             window.URL.revokeObjectURL(video.src);
             resolve(video.duration);
           };
-          const timeout = setTimeout(() => resolve(0), 1000); // Fallback
+          const timeout = setTimeout(() => resolve(0), 1000);
           video.onerror = function () {
             clearTimeout(timeout);
             resolve(0);
@@ -902,7 +924,6 @@
               "دخل الـ Master Key الأول عشان نرفع الداتا بمجرد ما نقرأها!",
             );
           }
-
           const files = Array.from(e.target.files).filter((f) =>
             f.name.toLowerCase().endsWith(".mp4"),
           );
@@ -912,24 +933,20 @@
           showLoading(
             `⏳ جاري قراءة ${files.length} فيديو بالثانية (هياخد ثواني)...`,
           );
-
           let dataObj = {};
           for (let file of files) {
             const parts = file.webkitRelativePath.split("/");
             let topicName = "توبيكات عامة",
               sessionName = "جلسات";
-
             if (parts.length >= 4) {
               topicName = parts[1];
               sessionName = parts[2];
             } else if (parts.length === 3) {
               topicName = parts[1];
             }
-
             if (!dataObj[topicName]) dataObj[topicName] = {};
             if (!dataObj[topicName][sessionName])
               dataObj[topicName][sessionName] = [];
-
             const durationSec = await getVideoDuration(file);
             dataObj[topicName][sessionName].push({
               title: file.name.replace(".mp4", ""),
@@ -1061,15 +1078,6 @@
         );
       }
 
-      // --- Dashboard & Time Calculation ---
-      function startDashboard(binId) {
-        document.getElementById("login-screen").style.display = "none";
-        document.getElementById("dashboard-screen").style.display = "block";
-        document.getElementById("display-bin-id").innerText = binId;
-        renderDashboard();
-      }
-
-      // دالة تحويل الوقت للغة الإنجليزية (h للمن الساعات و m للدقائق)
       function formatSecToTime(totalSeconds) {
         if (totalSeconds <= 0) return "0m";
         const totalMins = Math.round(totalSeconds / 60);
@@ -1097,7 +1105,21 @@
           let detailsHTML = "";
 
           topic.sessions.forEach((session, sIndex) => {
-            detailsHTML += `<div class="session-block"><div class="session-title">${session.name}</div>`;
+            // Check if all videos in this session are completed
+            const isAllCompleted = session.videos.every((v) => v.completed);
+            const btnText = isAllCompleted ? "إلغاء الكل" : "تحديد الكل ✔";
+            const btnClass = isAllCompleted
+              ? "session-toggle-btn active"
+              : "session-toggle-btn";
+
+            detailsHTML += `
+                        <div class="session-block">
+                            <div class="session-header-flex">
+                                <div class="session-title">${session.name}</div>
+                                <button class="${btnClass}" onclick="toggleSession(${tIndex}, ${sIndex}, event)">${btnText}</button>
+                            </div>
+                    `;
+
             session.videos.forEach((video, vIndex) => {
               topicTotalSec += video.sec;
               topicTotalVideos++;
@@ -1127,7 +1149,6 @@
           globalCompletedVideos += topicCompletedVideos;
 
           const speedAdjustedTotal = topicTotalSec / currentSpeed;
-          const speedAdjustedCompleted = topicCompletedSec / currentSpeed;
           const speedAdjustedRemaining =
             Math.max(0, topicTotalSec - topicCompletedSec) / currentSpeed;
 
@@ -1154,7 +1175,6 @@
         const topRemainingSec =
           Math.max(0, globalTotalSec - globalCompletedSec) / currentSpeed;
 
-        // Updated IDs mapping for English time rendering
         document.getElementById("stat-total-videos").innerText =
           globalTotalVideos;
         document.getElementById("stat-completed-videos").innerText =
@@ -1170,6 +1190,24 @@
       window.toggleVideo = function (t, s, v) {
         courseData[t].sessions[s].videos[v].completed =
           !courseData[t].sessions[s].videos[v].completed;
+        renderDashboard();
+        triggerCloudSave();
+        document.getElementById(`mod-${t}`).classList.add("open");
+      };
+
+      // New function to toggle entire session
+      window.toggleSession = function (t, s, event) {
+        // Prevent the click from triggering parent elements if any
+        event.stopPropagation();
+
+        const session = courseData[t].sessions[s];
+        const isAllCompleted = session.videos.every((v) => v.completed);
+
+        // If all are completed, uncheck all. Otherwise, check all.
+        session.videos.forEach((v) => {
+          v.completed = !isAllCompleted;
+        });
+
         renderDashboard();
         triggerCloudSave();
         document.getElementById(`mod-${t}`).classList.add("open");
